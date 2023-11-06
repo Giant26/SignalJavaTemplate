@@ -98,30 +98,44 @@ public class Main {
 		 **********************************/
 
 		//generate my Identity Key
-		AsymmetricCipherKeyPair identityKey = keygen.generateKeyPair();
+		//AsymmetricCipherKeyPair identityKey = keygen.generateKeyPair();
 
+		//DH1
 		//DHK of my identity key and bobs signed prekey
 		agreementAlgorithm.init(identityKey.getPrivate());
 		int off = 0;
 		agreementAlgorithm.calculateAgreement(bobPreKey, x3dhKeys, off);
 		off = off + X25519.POINT_SIZE;
 
+		//DH2
 		//DHK of my ephermarl and bobs identity key
 		agreementAlgorithm.init(ephemeralKey.getPrivate());
 		agreementAlgorithm.calculateAgreement(bobIdentityKey, x3dhKeys, off);
 		off = off + X25519.POINT_SIZE;
 
+		//DH3
 		//DHK of my ephemeral and bobs signed prekey
 		agreementAlgorithm.init(ephemeralKey.getPrivate());
 		agreementAlgorithm.calculateAgreement(bobPreKey, x3dhKeys, off);
 		off = off + X25519.POINT_SIZE;
 
+		//DH4
 		//DHK of my ephemeral and bobs one time pre key
 		agreementAlgorithm.init(ephemeralKey.getPrivate());
 		agreementAlgorithm.calculateAgreement(bobOneTimePreKey, x3dhKeys, off);
 		off = off + X25519.POINT_SIZE;
 
 		//Should now have DH1, DH2, DH3 and DH4
+		System.out.println("Computed x3dh keys:");
+		for (int i = 0; i < 4; i++) { 
+			System.out.print("DH" + (i + 1) + ": ");
+			for (int j = 0; j < X25519.POINT_SIZE; j++) {
+				System.out.printf("%02X", x3dhKeys[i * X25519.POINT_SIZE + j] & 0xFF);
+			}
+			System.out.println();
+		}
+		
+
 
 		// Compute session key for initializing root ratchet
 		HKDFBytesGenerator hkdf = new HKDFBytesGenerator(new SHA256Digest());
@@ -137,13 +151,9 @@ public class Main {
 		/*******************************************
 		 * TODO: complete DH ratchet initialization
 		 *******************************************/
-		dhRatchet.setLocalPrivateKey((X25519PrivateKeyParameters) dhKey.getPrivate());
-		dhRatchet.setRemotePublicKey(bobPreKey);
 
-		byte[] dhRatchetSharedSecret = dhRatchet.getSharedSecret();
-
-		rootRatchet = new RootRatchet(dhRatchetSharedSecret);
-
+		dhRatchet.localPrivateKey = (X25519PrivateKeyParameters) dhKey.getPrivate();
+		dhRatchet.remotePublicKey = bobPreKey;
 		// Initialize send ratchet
 		sendRatchet = new SendReceiveRatchet(rootRatchet.step(dhRatchet.getSharedSecret()));
 
@@ -158,13 +168,27 @@ public class Main {
 		/***************************************
 		 * TODO: complete first message request
 		 ***************************************/
-		firstMessageRequest.setFirstMessageEncrypted(firstMessageEncrypted);
+		byte[] nonce = Arrays.copyOfRange(firstMessageEncrypted, 0, 12); 
+		byte[] cipherText = Arrays.copyOfRange(firstMessageEncrypted, 12, firstMessageEncrypted.length); 
 
-		 
+
+		firstMessageRequest.setAuthHeader(authResponse.getAuthenticationData());
+		firstMessageRequest.setAliceIdentityKey(((X25519PublicKeyParameters)identityKey.getPublic()).getEncoded());
+		firstMessageRequest.setAliceEphemeralKey(((X25519PublicKeyParameters)ephemeralKey.getPublic()).getEncoded());
+		firstMessageRequest.setNewRatchetPublicKey(((X25519PublicKeyParameters)dhKey.getPublic()).getEncoded());
+		firstMessageRequest.setFirstMessageNonce(nonce);
+		firstMessageRequest.setFirstMessageEncrypted(cipherText);
+
+		System.out.println(firstMessageRequest.toString());
+
+
+
         // Get first message response
-		MessageResponse firstMessageResponse = api.firstMessage(firstMessageRequest);
-		boolean allowUpdateDhKey = handleMessageResponse(firstMessageResponse);
 
+		MessageResponse firstMessageResponse = api.firstMessage(firstMessageRequest);
+
+		boolean allowUpdateDhKey = handleMessageResponse(firstMessageResponse);
+		
 		// Message loop
 		while (true) {
 
@@ -207,16 +231,16 @@ public class Main {
 
 
 			// Insert debug stuff if needed 
-			DebugRequest debugRequest = new DebugRequest();
+			//DebugRequest debugRequest = new DebugRequest();
 			/**********************************************************
 		 	* TODO (optional): DEBUG AREA: insert parameters if needed
 		 	***********************************************************/
 
 
 
-			System.out.println(debugRequest.toString());
-			DebugResponse debugResponse = api.message(debugRequest);
-			System.out.println(debugResponse.toString());
+			//System.out.println(debugRequest.toString());
+			//DebugResponse debugResponse = api.message(debugRequest);
+			//System.out.println(debugResponse.toString());
 
 
 

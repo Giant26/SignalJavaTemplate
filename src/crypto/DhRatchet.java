@@ -23,20 +23,4 @@ public class DhRatchet {
 		
 	}
 
-	public X25519PrivateKeyParameters getLocalPrivateKey() {
-		return localPrivateKey;
-	}
-
-	public void setLocalPrivateKey(X25519PrivateKeyParameters localPrivateKey) {
-		this.localPrivateKey = localPrivateKey;
-	}
-
-	public X25519PublicKeyParameters getRemotePublicKey() {
-		return remotePublicKey;
-	}
-
-	public void setRemotePublicKey(X25519PublicKeyParameters remotePublicKey) {
-		this.remotePublicKey = remotePublicKey;
-	}
-
 }
