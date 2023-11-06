@@ -126,13 +126,13 @@ public class Main {
 		off = off + X25519.POINT_SIZE;
 
 		//Should now have DH1, DH2, DH3 and DH4
-		System.out.println("Computed x3dh keys:");
+		//System.out.println("Computed x3dh keys:");
 		for (int i = 0; i < 4; i++) { 
-			System.out.print("DH" + (i + 1) + ": ");
+			//System.out.print("DH" + (i + 1) + ": ");
 			for (int j = 0; j < X25519.POINT_SIZE; j++) {
-				System.out.printf("%02X", x3dhKeys[i * X25519.POINT_SIZE + j] & 0xFF);
+				//System.out.printf("%02X", x3dhKeys[i * X25519.POINT_SIZE + j] & 0xFF);
 			}
-			System.out.println();
+			//System.out.println();
 		}
 		
 
@@ -179,14 +179,13 @@ public class Main {
 		firstMessageRequest.setFirstMessageNonce(nonce);
 		firstMessageRequest.setFirstMessageEncrypted(cipherText);
 
-		System.out.println(firstMessageRequest.toString());
+		//System.out.println(firstMessageRequest.toString());
 
 
 
         // Get first message response
 
 		MessageResponse firstMessageResponse = api.firstMessage(firstMessageRequest);
-
 		boolean allowUpdateDhKey = handleMessageResponse(firstMessageResponse);
 		
 		// Message loop
@@ -213,14 +212,17 @@ public class Main {
 					/*******************************************************
 					* TODO: Generate and set new private key for DH ratchet
 		 			********************************************************/
-					AsymmetricCipherKeyPair newDhKey = null;
+					dhKey = keygen.generateKeyPair();
 
 
 
 					/***********************************
 					* TODO: Initialize new send ratchet
 		 			************************************/
-					
+					dhRatchet.localPrivateKey= (X25519PrivateKeyParameters) dhKey.getPrivate();
+
+					byte[] newSharedSecret = dhRatchet.getSharedSecret(); 
+					sendRatchet = new SendReceiveRatchet(rootRatchet.step(newSharedSecret));
 
 
 					// Toggle flag
@@ -236,7 +238,7 @@ public class Main {
 		 	* TODO (optional): DEBUG AREA: insert parameters if needed
 		 	***********************************************************/
 
-
+			//debugRequest.authHeader(authResponse.getAuthenticationData());
 
 			//System.out.println(debugRequest.toString());
 			//DebugResponse debugResponse = api.message(debugRequest);
@@ -254,7 +256,18 @@ public class Main {
 			/********************************
 		 	* TODO: complete message request
 			 ********************************/
-			 
+
+			byte[] messageNonce = Arrays.copyOfRange(messageEncrypted, 0, 12); 
+			byte[] messageCipherText = Arrays.copyOfRange(messageEncrypted, 12, messageEncrypted.length); 
+
+			messageRequest.setAuthHeader(authResponse.getAuthenticationData());
+			if(dhKeyChanged){
+				messageRequest.setNewRatchetPublicKey(((X25519PublicKeyParameters)dhKey.getPublic()).getEncoded());	
+			}
+			messageRequest.setMessageNonce(messageNonce);
+			messageRequest.setMessageEncrypted(messageCipherText);
+
+			//System.out.println(messageRequest.toString());
 
 
 			// Get message response
@@ -300,9 +313,10 @@ public class Main {
 		if (response.getNewRatchetPublicKey() != null) {
 			// Update ratchet
 			dhRatchet.remotePublicKey = new X25519PublicKeyParameters(response.getNewRatchetPublicKey(), 0);
-
+			
 			// Create new receive ratchet
 			receiveRatchet = new SendReceiveRatchet(rootRatchet.step(dhRatchet.getSharedSecret()));
+			//System.out.println("Received signal to update remote DH public key and created new receive ratchet!");
 		}
 
 		// Compose associated data for encryption
